@@ -4,7 +4,7 @@ import io
 
 app = Flask(__name__)
 
-# Metadados XMP que "ativam" o giro 360 no Facebook/Google
+# O "Carimbo" 360 que faz a mágica
 XMP_TAG = (
     '<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?>'
     '<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="Adobe XMP Core 5.1.0-jc003">'
@@ -26,26 +26,28 @@ XMP_TAG = (
 def index():
     return render_template('index.html')
 
-@app.route('/convert', methods=['POST'])
-def convert():
-    if 'image' not in request.files:
-        return "Nenhuma imagem enviada", 400
-    
+@app.route('/convert/<format_type>', methods=['POST'])
+def convert(format_type):
     file = request.files['image']
-    img = Image.open(file.stream)
+    img = Image.open(file.stream).convert("RGB")
     
-    # Converte para RGB (evita erro com PNG transparente)
-    img = img.convert("RGB")
-    
-    # Redimensiona para 4096x2048 (Proporção de Ouro 2:1)
+    # Redimensionamento de alta qualidade 2:1
     img_360 = img.resize((4096, 2048), Image.Resampling.LANCZOS)
-    
     img_io = io.BytesIO()
-    # SALVA INJETANDO O XMP (O segredo que o JavaScript não consegue fazer)
-    img_360.save(img_io, 'JPEG', quality=90, xmp=XMP_TAG)
+
+    if format_type == 'png':
+        # PNG Full (Pesado)
+        img_360.save(img_io, 'PNG', xmp=XMP_TAG)
+        name = "PANO_360_FULL.png"
+        mime = "image/png"
+    else:
+        # JPG Leve (Photooxy style)
+        img_360.save(img_io, 'JPEG', quality=85, xmp=XMP_TAG)
+        name = "PANO_360_LEVE.jpg"
+        mime = "image/jpeg"
+
     img_io.seek(0)
-    
-    return send_file(img_io, mimetype='image/jpeg', as_attachment=True, download_name='PANO_360_REAL.jpg')
+    return send_file(img_io, mimetype=mime, as_attachment=True, download_name=name)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)
