@@ -1,68 +1,40 @@
-const fileUpload = document.getElementById('image-input');
-const btnJpg = document.getElementById('btn-jpg');
-const btnPng = document.getElementById('btn-png');
-const panoramaContainer = document.getElementById('panorama-container');
-let imagemOriginal = null;
+let imgOriginal = null;
 
-// 1. Detecta o carregamento da imagem
-fileUpload.addEventListener('change', function(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-
+document.getElementById('arquivo').onchange = function(e) {
     const reader = new FileReader();
     reader.onload = function(event) {
-        imagemOriginal = new Image();
-        imagemOriginal.onload = function() {
-            // Ativa os botões de download
-            btnJpg.style.display = 'inline-block';
-            btnPng.style.display = 'inline-block';
-
-            // Inicia o Preview 360 (Pannellum)
-            panoramaContainer.innerHTML = '';
-            pannellum.viewer('panorama-container', {
+        imgOriginal = new Image();
+        imgOriginal.onload = function() {
+            // Preview para você ver se carregou
+            pannellum.viewer('panorama', {
                 "type": "equirectangular",
                 "panorama": event.target.result,
-                "autoLoad": true,
-                "vaov": 180,
-                "haov": 360
+                "autoLoad": true
             });
         };
-        imagemOriginal.src = event.target.result;
+        imgOriginal.src = event.target.result;
     };
-    reader.readAsDataURL(file);
-});
+    reader.readAsDataURL(e.target.files[0]);
+};
 
-// 2. Função de Conversão e Download (Executada no Navegador)
-function baixar360(formato) {
-    if (!imagemOriginal) return;
+function converter(formato) {
+    if(!imgOriginal) return alert("Escolha uma foto primeiro!");
 
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
-
-    // Forçamos a Proporção de Ouro 2:1 (4096x2048)
-    // Isso é o que "engana" o Facebook para ativar o modo 360
+    
+    // Proporção obrigatória 2:1
     canvas.width = 4096;
     canvas.height = 2048;
-
-    // Desenha a imagem esticando-a para preencher toda a esfera
-    ctx.fillStyle = "#000";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(imagemOriginal, 0, 0, canvas.width, canvas.height);
+    ctx.drawImage(imgOriginal, 0, 0, canvas.width, canvas.height);
 
     const mime = formato === 'png' ? 'image/png' : 'image/jpeg';
-    const qualidade = formato === 'png' ? 1.0 : 0.9;
-
+    
     canvas.toBlob((blob) => {
-        const url = URL.createObjectURL(blob);
+        // Criar o link de download
         const link = document.createElement('a');
-        link.href = url;
-        
-        // Nome do arquivo com prefixo PANO_ para reconhecimento automático
-        link.download = `PANO_360_CONVERTIDO.${formato}`;
-        
-        document.body.appendChild(link);
+        link.download = `PANO_360_BRYAN.${formato}`;
+        link.href = URL.createObjectURL(blob);
         link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-    }, mime, qualidade);
+    }, mime, 0.9);
 }
