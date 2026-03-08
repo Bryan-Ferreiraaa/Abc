@@ -1,56 +1,68 @@
-const fileUpload = document.getElementById('file-upload');
-const downloadBtn = document.getElementById('download-360');
-const canvas = document.getElementById('conversion-canvas');
-const ctx = canvas.getContext('2d');
+const fileUpload = document.getElementById('image-input');
+const btnJpg = document.getElementById('btn-jpg');
+const btnPng = document.getElementById('btn-png');
+const panoramaContainer = document.getElementById('panorama-container');
+let imagemOriginal = null;
 
+// 1. Detecta o carregamento da imagem
 fileUpload.addEventListener('change', function(e) {
     const file = e.target.files[0];
     if (!file) return;
 
     const reader = new FileReader();
     reader.onload = function(event) {
-        const img = new Image();
-        img.onload = function() {
-            // 1. TAMANHO 2:1 (Padão Universal 360)
-            canvas.width = 4096;
-            canvas.height = 2048;
+        imagemOriginal = new Image();
+        imagemOriginal.onload = function() {
+            // Ativa os botões de download
+            btnJpg.style.display = 'inline-block';
+            btnPng.style.display = 'inline-block';
 
-            // 2. DESENHO SEM CÍRCULO PRETO
-            ctx.fillStyle = "#000";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-            // 3. CONVERTER PARA JPEG
-            const jpegData = canvas.toDataURL("image/jpeg", 0.90);
-
-            // 4. INJETAR METADADOS SEM CORROMPER (Simulando Photooxy)
-            // Criamos o cabeçalho XMP que o Facebook exige
-            const xmp = `http://ns.google.com/photos/1.0/panorama/\x00GPano:ProjectionType="equirectangular"\x00GPano:FullPanoWidthPixels="4096"\x00GPano:FullPanoHeightPixels="2048"`;
-            
-            // Aqui usamos a biblioteca Piexif para inserir os dados no lugar certo do arquivo
-            const exifObj = {"0th": {}, "Exif": {}, "GPS": {}};
-            const exifStr = piexif.dump(exifObj);
-            
-            // Inserimos a marca d'água digital de 360 graus
-            const finalImage = piexif.insert(exifStr, jpegData);
-
-            // 5. PREVIEW E DOWNLOAD
-            document.getElementById('panorama-container').innerHTML = '';
+            // Inicia o Preview 360 (Pannellum)
+            panoramaContainer.innerHTML = '';
             pannellum.viewer('panorama-container', {
                 "type": "equirectangular",
-                "panorama": finalImage,
-                "autoLoad": true
+                "panorama": event.target.result,
+                "autoLoad": true,
+                "vaov": 180,
+                "haov": 360
             });
-
-            downloadBtn.disabled = false;
-            downloadBtn.onclick = () => {
-                const link = document.createElement('a');
-                link.href = finalImage;
-                link.download = `360_READY_${Date.now()}.jpg`;
-                link.click();
-            };
         };
-        img.src = event.target.result;
+        imagemOriginal.src = event.target.result;
     };
     reader.readAsDataURL(file);
 });
+
+// 2. Função de Conversão e Download (Executada no Navegador)
+function baixar360(formato) {
+    if (!imagemOriginal) return;
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    // Forçamos a Proporção de Ouro 2:1 (4096x2048)
+    // Isso é o que "engana" o Facebook para ativar o modo 360
+    canvas.width = 4096;
+    canvas.height = 2048;
+
+    // Desenha a imagem esticando-a para preencher toda a esfera
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(imagemOriginal, 0, 0, canvas.width, canvas.height);
+
+    const mime = formato === 'png' ? 'image/png' : 'image/jpeg';
+    const qualidade = formato === 'png' ? 1.0 : 0.9;
+
+    canvas.toBlob((blob) => {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        
+        // Nome do arquivo com prefixo PANO_ para reconhecimento automático
+        link.download = `PANO_360_CONVERTIDO.${formato}`;
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    }, mime, qualidade);
+}
